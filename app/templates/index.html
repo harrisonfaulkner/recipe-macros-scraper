@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Macros</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root {
+            --pico-font-size: 16px;
+        }
+        .results-section { display: none; }
+        .macro-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .macro-card {
+            text-align: center;
+            padding: 1rem;
+            border-radius: var(--pico-border-radius);
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+        }
+        .macro-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: block;
+        }
+        .macro-card .label {
+            font-size: 0.85rem;
+            color: var(--pico-muted-color);
+        }
+        .ingredient-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+        .ingredient-row:last-child { border-bottom: none; }
+        .warning { color: var(--pico-del-color); font-size: 0.9rem; }
+        .instruction-step {
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <hgroup>
+            <h1>Recipe Macros</h1>
+            <p>Paste a recipe URL to get per-serving nutrition info</p>
+        </hgroup>
+
+        <form id="recipe-form" role="search">
+            <input
+                type="url"
+                id="url-input"
+                name="url"
+                placeholder="https://www.allrecipes.com/recipe/..."
+                required
+                onfocus="this.select()"
+            >
+            <button type="submit" id="submit-btn">Analyze</button>
+        </form>
+
+        <div id="error-msg" style="display:none;">
+            <article aria-label="Error">
+                <p id="error-text"></p>
+            </article>
+        </div>
+
+        <section id="results" class="results-section">
+            <article>
+                <header>
+                    <h2 id="recipe-title"></h2>
+                    <p><small id="recipe-servings"></small></p>
+                </header>
+
+                <h3>Per Serving</h3>
+                <div id="per-serving-macros" class="macro-grid"></div>
+
+                <details>
+                    <summary>Total Recipe</summary>
+                    <div id="total-macros" class="macro-grid"></div>
+                </details>
+
+                <h3>Ingredients</h3>
+                <div id="ingredients-list"></div>
+
+                <div id="instructions-section" style="display:none;">
+                    <h3>Cooking Instructions</h3>
+                    <details>
+                        <summary>Show steps</summary>
+                        <div id="instructions-content"></div>
+                    </details>
+                </div>
+
+                <div id="warnings-section" style="display:none;">
+                    <h4>Warnings</h4>
+                    <ul id="warnings-list"></ul>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        const form = document.getElementById('recipe-form');
+        const urlInput = document.getElementById('url-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const errorMsg = document.getElementById('error-msg');
+        const errorText = document.getElementById('error-text');
+        const results = document.getElementById('results');
+
+        // Strip tracking/UTM parameters from recipe URLs
+        function cleanUrl(raw) {
+            try {
+                const u = new URL(raw);
+                const trash = [];
+                for (const key of u.searchParams.keys()) {
+                    if (/^utm_/i.test(key) || /^(fbclid|gclid|gclsrc|dclid|gbraid|wbraid|msclkid|mc_[ce]id|oly_[ae]|_openstat|vero_id|wickedid|yclid|__s|_hsenc|_hsmi|mkt_tok|ref|sref|partner|campaign_id|ad_id|adgroup|placement|network|matchtype|creative|keyword|device|irclickid|irgwc|si|igsh|igshid|share_source|feature|s)$/i.test(key)) {
+                        trash.push(key);
+                    }
+                }
+                trash.forEach(k => u.searchParams.delete(k));
+                return u.toString();
+            } catch {
+                return raw;
+            }
+        }
+
+        async function analyzeUrl(url) {
+            url = cleanUrl(url);
+            submitBtn.setAttribute('aria-busy', 'true');
+            submitBtn.disabled = true;
+            errorMsg.style.display = 'none';
+            results.style.display = 'none';
+
+            try {
+                const resp = await fetch('/api/v1/recipe/parse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url }),
+                });
+
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'Failed to parse recipe');
+                }
+
+                const data = await resp.json();
+
+                // Update URL bar so this result is shareable
+                const shareUrl = new URL(window.location.origin);
+                shareUrl.searchParams.set('url', url);
+                history.replaceState(null, '', shareUrl.toString());
+
+                // Update page title
+                document.title = `${data.title} - Recipe Macros`;
+
+                renderResults(data);
+            } catch (err) {
+                errorText.textContent = err.message;
+                errorMsg.style.display = 'block';
+            } finally {
+                submitBtn.removeAttribute('aria-busy');
+                submitBtn.disabled = false;
+            }
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const url = urlInput.value.trim();
+            if (!url) return;
+            analyzeUrl(url);
+        });
+
+        // Auto-analyze if ?url= is in the address bar
+        const params = new URLSearchParams(window.location.search);
+        const prefilledUrl = params.get('url');
+        if (prefilledUrl) {
+            urlInput.value = prefilledUrl;
+            analyzeUrl(prefilledUrl);
+        }
+
+        function renderMacros(container, macros) {
+            if (!macros) {
+                container.innerHTML = '<p>No nutrition data available yet</p>';
+                return;
+            }
+            const items = [
+                { label: 'Calories', value: Math.round(macros.calories), unit: '' },
+                { label: 'Protein', value: macros.protein_g.toFixed(1), unit: 'g' },
+                { label: 'Fat', value: macros.fat_g.toFixed(1), unit: 'g' },
+                { label: 'Carbs', value: macros.carbs_g.toFixed(1), unit: 'g' },
+                { label: 'Fiber', value: macros.fiber_g.toFixed(1), unit: 'g' },
+                { label: 'Sugar', value: macros.sugar_g.toFixed(1), unit: 'g' },
+                { label: 'Sodium', value: Math.round(macros.sodium_mg), unit: 'mg' },
+            ];
+            container.innerHTML = items.map(i => `
+                <div class="macro-card">
+                    <span class="value">${i.value}${i.unit}</span>
+                    <span class="label">${i.label}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderResults(data) {
+            document.getElementById('recipe-title').textContent = data.title;
+            const servingsText = data.servings ? `${data.servings} servings` : 'Servings unknown';
+            const sizeText = data.serving_size ? ` · ${data.serving_size}` : '';
+            document.getElementById('recipe-servings').textContent = servingsText + sizeText;
+
+            renderMacros(document.getElementById('per-serving-macros'), data.per_serving);
+            renderMacros(document.getElementById('total-macros'), data.total);
+
+            const ingredientsList = document.getElementById('ingredients-list');
+            ingredientsList.innerHTML = data.ingredients.map(ing => {
+                const macroStr = ing.macros
+                    ? `${Math.round(ing.macros.calories)} cal`
+                    : '';
+                return `
+                    <div class="ingredient-row">
+                        <span>${ing.original_text}</span>
+                        <span><small>${macroStr}</small></span>
+                    </div>
+                `;
+            }).join('');
+
+            // Instructions (collapsed by default)
+            const instructionsSection = document.getElementById('instructions-section');
+            const instructionsContent = document.getElementById('instructions-content');
+            if (data.instructions) {
+                const steps = data.instructions.split('\n').filter(s => s.trim());
+                instructionsContent.innerHTML = steps.map(step =>
+                    `<p class="instruction-step">${step}</p>`
+                ).join('');
+                instructionsSection.style.display = 'block';
+            } else {
+                instructionsSection.style.display = 'none';
+            }
+
+            // Warnings
+            const warningsSection = document.getElementById('warnings-section');
+            const warningsList = document.getElementById('warnings-list');
+            if (data.warnings && data.warnings.length > 0) {
+                warningsList.innerHTML = data.warnings.map(w =>
+                    `<li class="warning">${w}</li>`
+                ).join('');
+                warningsSection.style.display = 'block';
+            } else {
+                warningsSection.style.display = 'none';
+            }
+
+            results.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
