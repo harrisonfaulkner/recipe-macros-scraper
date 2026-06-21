@@ -1,126 +1,365 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recipe Macros</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <style>
-        :root {
-            --pico-font-size: 16px;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: "SF Mono", "Menlo", "Consolas", monospace;
+            background: #f4f5f7;
+            color: #1a1a1a;
+            font-size: 14px;
+            line-height: 1.5;
         }
-        .results-section { display: none; }
-        .macro-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 1.5rem 1.25rem;
         }
-        .macro-card {
-            text-align: center;
-            padding: 1rem;
-            border-radius: var(--pico-border-radius);
-            background: var(--pico-card-background-color);
-            border: 1px solid var(--pico-muted-border-color);
-        }
-        .macro-card .value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            display: block;
-        }
-        .macro-card .label {
-            font-size: 0.85rem;
-            color: var(--pico-muted-color);
-        }
-        .ingredient-row {
+
+        header {
+            margin-bottom: 1.5rem;
             display: flex;
             justify-content: space-between;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid var(--pico-muted-border-color);
+            align-items: baseline;
         }
-        .ingredient-row:last-child { border-bottom: none; }
-        .warning { color: var(--pico-del-color); font-size: 0.9rem; }
-        .instruction-step {
-            margin-bottom: 0.75rem;
-            line-height: 1.6;
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        header h1 a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+
+        header .tagline {
+            color: #8993a4;
+            font-size: 0.8rem;
+        }
+
+        /* Search */
+        .search-bar {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 0.55rem 0.75rem;
+            border: none;
+            font-family: inherit;
+            font-size: 0.85rem;
+            background: transparent;
+            color: #1a1a1a;
+            outline: none;
+        }
+
+        .search-bar input::placeholder {
+            color: #b0b8c4;
+        }
+
+        .search-bar input:focus {
+            background: #fafbfc;
+        }
+
+        .search-bar button {
+            padding: 0.55rem 1.1rem;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            font-weight: 600;
+        }
+
+        .search-bar button:hover {
+            background: #1d4ed8;
+        }
+
+        /* Error */
+        .error-box {
+            background: #fef2f2;
+            border-left: 3px solid #ef4444;
+            padding: 0.6rem 0.85rem;
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: #991b1b;
+            display: none;
+        }
+
+        /* Loading state */
+        .search-bar button[disabled] {
+            background: #93b4f5;
+            cursor: wait;
+        }
+
+        /* Card wrapper for results */
+        .result-card {
+            background: #fff;
+            border: 1px solid #e2e5ea;
+            border-radius: 8px;
+            padding: 1.25rem;
+            display: none;
+        }
+
+        /* Recipe title area */
+        .recipe-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            margin-bottom: 0.3rem;
+            color: #111;
+        }
+
+        .recipe-meta {
+            font-size: 0.8rem;
+            color: #8993a4;
+            margin-bottom: 1rem;
+        }
+
+        /* Divider inside card */
+        .divider {
+            border: none;
+            border-top: 1px solid #eef0f3;
+            margin: 1rem 0;
+        }
+
+        /* Macro table */
+        .macro-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .macro-table th {
+            text-align: left;
+            font-weight: 500;
+            color: #8993a4;
+            padding: 0.3rem 0.5rem;
+            border-bottom: 2px solid #eef0f3;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .macro-table td {
+            padding: 0.45rem 0.5rem;
+            border-bottom: 1px solid #f7f8fa;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .macro-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .macro-table .row-label {
+            font-weight: 600;
+            width: 100px;
+            color: #4b5563;
+        }
+
+        .macro-table .cal-val {
+            color: #2563eb;
+            font-weight: 700;
+        }
+
+        /* Ingredients */
+        .section-head {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8993a4;
+            margin: 1.25rem 0 0.5rem 0;
+        }
+
+        .ing-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 0.4rem 0;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #f2f3f6;
+            transition: background 0.1s;
+        }
+
+        .ing-row:hover {
+            background: #f7f9fc;
+        }
+
+        .ing-row:last-child {
+            border-bottom: none;
+        }
+
+        .ing-row .kcal {
+            color: #8993a4;
+            white-space: nowrap;
+            margin-left: 1rem;
+        }
+
+        /* Toggle */
+        details {
+            margin: 0.75rem 0;
+        }
+
+        details summary {
+            font-size: 0.8rem;
+            color: #5b7bb3;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        details summary:hover {
+            color: #2563eb;
+        }
+
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details summary::before {
+            content: "[+] ";
+        }
+
+        details[open] summary::before {
+            content: "[-] ";
+        }
+
+        /* Instructions */
+        .step {
+            margin-bottom: 0.5rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            font-size: 0.9rem;
+            padding-left: 1.5rem;
+            text-indent: -1.5rem;
+            color: #374151;
+        }
+
+        .step-num {
+            display: inline-block;
+            width: 1.5rem;
+            color: #b0b8c4;
+            text-indent: 0;
+            font-family: "SF Mono", "Menlo", "Consolas", monospace;
+            font-size: 0.8rem;
+        }
+
+        /* Warnings */
+        .warn-list {
+            font-size: 0.8rem;
+            color: #b07020;
+            list-style: none;
+            margin-top: 0.75rem;
+            background: #fefce8;
+            border-left: 3px solid #eab308;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .warn-list li {
+            padding: 0.2rem 0;
+        }
+
+        .warn-list li::before {
+            content: "! ";
+            font-weight: 700;
+            color: #ca8a04;
         }
     </style>
 </head>
 <body>
-    <main class="container">
-        <hgroup>
-            <h1><a href="/" style="text-decoration:none;color:inherit;">Recipe Macros</a></h1>
-            <p>Paste a recipe URL to get per-serving nutrition info</p>
-        </hgroup>
+    <div class="container">
+        <header>
+            <h1><a href="/">recipe macros</a></h1>
+            <span class="tagline">url &rarr; nutrition</span>
+        </header>
 
-        <form id="recipe-form" role="search">
+        <form id="recipe-form" class="search-bar">
             <input
                 type="url"
                 id="url-input"
-                name="url"
-                placeholder="https://www.allrecipes.com/recipe/..."
+                placeholder="paste recipe url"
                 required
                 onfocus="this.select()"
             >
-            <button type="submit" id="submit-btn">Analyze</button>
+            <button type="submit" id="submit-btn">go</button>
         </form>
 
-        <div id="error-msg" style="display:none;">
-            <article aria-label="Error">
-                <p id="error-text"></p>
-            </article>
-        </div>
+        <div id="error-msg" class="error-box"></div>
 
-        <section id="results" class="results-section">
-            <article>
-                <header>
-                    <h2 id="recipe-title"></h2>
-                    <p><small id="recipe-servings"></small></p>
-                </header>
+        <div id="results" class="result-card">
+            <div id="recipe-title" class="recipe-title"></div>
+            <div id="recipe-meta" class="recipe-meta"></div>
 
-                <h3>Per Serving</h3>
-                <div id="per-serving-macros" class="macro-grid"></div>
+            <table class="macro-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>cal</th>
+                        <th>protein</th>
+                        <th>fat</th>
+                        <th>carbs</th>
+                        <th>fiber</th>
+                        <th>sugar</th>
+                        <th>sodium</th>
+                    </tr>
+                </thead>
+                <tbody id="per-serving-row"></tbody>
+            </table>
 
+            <details>
+                <summary>total recipe</summary>
+                <table class="macro-table" style="margin-top: 0.5rem;">
+                    <tbody id="total-row"></tbody>
+                </table>
+            </details>
+
+            <hr class="divider">
+
+            <div class="section-head">Ingredients</div>
+            <div id="ingredients-list"></div>
+
+            <div id="instructions-section" style="display:none;">
+                <hr class="divider">
                 <details>
-                    <summary>Total Recipe</summary>
-                    <div id="total-macros" class="macro-grid"></div>
+                    <summary>cooking instructions</summary>
+                    <div id="instructions-content" style="margin-top: 0.5rem;"></div>
                 </details>
+            </div>
 
-                <h3>Ingredients</h3>
-                <div id="ingredients-list"></div>
-
-                <div id="instructions-section" style="display:none;">
-                    <h3>Cooking Instructions</h3>
-                    <details>
-                        <summary>Show steps</summary>
-                        <div id="instructions-content"></div>
-                    </details>
-                </div>
-
-                <div id="warnings-section" style="display:none;">
-                    <h4>Warnings</h4>
-                    <ul id="warnings-list"></ul>
-                </div>
-            </article>
-        </section>
-    </main>
+            <ul id="warnings-list" class="warn-list" style="display:none;"></ul>
+        </div>
+    </div>
 
     <script>
         const form = document.getElementById('recipe-form');
         const urlInput = document.getElementById('url-input');
         const submitBtn = document.getElementById('submit-btn');
         const errorMsg = document.getElementById('error-msg');
-        const errorText = document.getElementById('error-text');
         const results = document.getElementById('results');
 
-        // HTML-escape to prevent XSS from scraped content
         function esc(str) {
             const d = document.createElement('div');
             d.textContent = str;
             return d.innerHTML;
         }
 
-        // Strip tracking/UTM parameters from recipe URLs
         function cleanUrl(raw) {
             try {
                 const u = new URL(raw);
@@ -139,8 +378,8 @@
 
         async function analyzeUrl(url) {
             url = cleanUrl(url);
-            submitBtn.setAttribute('aria-busy', 'true');
             submitBtn.disabled = true;
+            submitBtn.textContent = '...';
             errorMsg.style.display = 'none';
             results.style.display = 'none';
 
@@ -158,21 +397,19 @@
 
                 const data = await resp.json();
 
-                // Update URL bar so this result is shareable
                 const shareUrl = new URL(window.location.origin);
                 shareUrl.searchParams.set('url', url);
                 history.replaceState(null, '', shareUrl.toString());
 
-                // Update page title
-                document.title = `${data.title} - Recipe Macros`;
+                document.title = data.title + ' - Recipe Macros';
 
                 renderResults(data);
             } catch (err) {
-                errorText.textContent = err.message;
+                errorMsg.textContent = err.message;
                 errorMsg.style.display = 'block';
             } finally {
-                submitBtn.removeAttribute('aria-busy');
                 submitBtn.disabled = false;
+                submitBtn.textContent = 'go';
             }
         }
 
@@ -183,7 +420,6 @@
             analyzeUrl(url);
         });
 
-        // Auto-analyze if ?url= is in the address bar
         const params = new URLSearchParams(window.location.search);
         const prefilledUrl = params.get('url');
         if (prefilledUrl) {
@@ -191,73 +427,61 @@
             analyzeUrl(prefilledUrl);
         }
 
-        function renderMacros(container, macros) {
+        function renderMacroRow(container, label, macros) {
             if (!macros) {
-                container.innerHTML = '<p>No nutrition data available yet</p>';
+                container.innerHTML = '<tr><td colspan="8" style="color:#8993a4;">No nutrition data available</td></tr>';
                 return;
             }
-            const items = [
-                { label: 'Calories', value: Math.round(macros.calories), unit: '' },
-                { label: 'Protein', value: macros.protein_g.toFixed(1), unit: 'g' },
-                { label: 'Fat', value: macros.fat_g.toFixed(1), unit: 'g' },
-                { label: 'Carbs', value: macros.carbs_g.toFixed(1), unit: 'g' },
-                { label: 'Fiber', value: macros.fiber_g.toFixed(1), unit: 'g' },
-                { label: 'Sugar', value: macros.sugar_g.toFixed(1), unit: 'g' },
-                { label: 'Sodium', value: Math.round(macros.sodium_mg), unit: 'mg' },
-            ];
-            container.innerHTML = items.map(i => `
-                <div class="macro-card">
-                    <span class="value">${i.value}${i.unit}</span>
-                    <span class="label">${i.label}</span>
-                </div>
-            `).join('');
+            container.innerHTML = `
+                <tr>
+                    <td class="row-label">${esc(label)}</td>
+                    <td class="cal-val">${Math.round(macros.calories)}</td>
+                    <td>${macros.protein_g.toFixed(1)}g</td>
+                    <td>${macros.fat_g.toFixed(1)}g</td>
+                    <td>${macros.carbs_g.toFixed(1)}g</td>
+                    <td>${macros.fiber_g.toFixed(1)}g</td>
+                    <td>${macros.sugar_g.toFixed(1)}g</td>
+                    <td>${Math.round(macros.sodium_mg)}mg</td>
+                </tr>
+            `;
         }
 
         function renderResults(data) {
             document.getElementById('recipe-title').textContent = data.title;
-            const servingsText = data.servings ? `${data.servings} servings` : 'Servings unknown';
-            const sizeText = data.serving_size ? ` · ${data.serving_size}` : '';
-            document.getElementById('recipe-servings').textContent = servingsText + sizeText;
 
-            renderMacros(document.getElementById('per-serving-macros'), data.per_serving);
-            renderMacros(document.getElementById('total-macros'), data.total);
+            const servings = data.servings ? data.servings + ' servings' : 'Servings unknown';
+            const size = data.serving_size ? ' \u00b7 ' + data.serving_size : '';
+            document.getElementById('recipe-meta').textContent = servings + size;
 
-            const ingredientsList = document.getElementById('ingredients-list');
-            ingredientsList.innerHTML = data.ingredients.map(ing => {
-                const macroStr = ing.macros
-                    ? `${Math.round(ing.macros.calories)} cal`
-                    : '';
-                return `
-                    <div class="ingredient-row">
-                        <span>${esc(ing.original_text)}</span>
-                        <span><small>${macroStr}</small></span>
-                    </div>
-                `;
+            renderMacroRow(document.getElementById('per-serving-row'), 'per serving', data.per_serving);
+            renderMacroRow(document.getElementById('total-row'), 'total', data.total);
+
+            const ingList = document.getElementById('ingredients-list');
+            ingList.innerHTML = data.ingredients.map(ing => {
+                const cal = ing.macros ? Math.round(ing.macros.calories) + ' cal' : '';
+                return `<div class="ing-row"><span>${esc(ing.original_text)}</span><span class="kcal">${cal}</span></div>`;
             }).join('');
 
-            // Instructions (collapsed by default)
-            const instructionsSection = document.getElementById('instructions-section');
-            const instructionsContent = document.getElementById('instructions-content');
+            const instrSection = document.getElementById('instructions-section');
+            const instrContent = document.getElementById('instructions-content');
             if (data.instructions) {
                 const steps = data.instructions.split('\n').filter(s => s.trim());
-                instructionsContent.innerHTML = steps.map(step =>
-                    `<p class="instruction-step">${esc(step)}</p>`
+                instrContent.innerHTML = steps.map((step, i) =>
+                    `<p class="step"><span class="step-num">${i + 1}.</span>${esc(step)}</p>`
                 ).join('');
-                instructionsSection.style.display = 'block';
+                instrSection.style.display = 'block';
             } else {
-                instructionsSection.style.display = 'none';
+                instrSection.style.display = 'none';
             }
 
-            // Warnings
-            const warningsSection = document.getElementById('warnings-section');
-            const warningsList = document.getElementById('warnings-list');
+            const warnList = document.getElementById('warnings-list');
             if (data.warnings && data.warnings.length > 0) {
-                warningsList.innerHTML = data.warnings.map(w =>
-                    `<li class="warning">${esc(w)}</li>`
+                warnList.innerHTML = data.warnings.map(w =>
+                    `<li>${esc(w)}</li>`
                 ).join('');
-                warningsSection.style.display = 'block';
+                warnList.style.display = 'block';
             } else {
-                warningsSection.style.display = 'none';
+                warnList.style.display = 'none';
             }
 
             results.style.display = 'block';
