@@ -17,8 +17,8 @@ Supports 646+ recipe websites including BBC Good Food, Budget Bytes, Food Networ
 The easiest way to run this is with the pre-built image from GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/harrisonfaulkner/calorie-app:latest
-docker run -p 8000:8000 ghcr.io/harrisonfaulkner/calorie-app:latest
+docker pull ghcr.io/harrisonfaulkner/recipe-macros-scraper:latest
+docker run -p 8000:8000 ghcr.io/harrisonfaulkner/recipe-macros-scraper:latest
 ```
 
 Or with docker compose, create a `docker-compose.yml`:
@@ -26,7 +26,7 @@ Or with docker compose, create a `docker-compose.yml`:
 ```yaml
 services:
   app:
-    image: ghcr.io/harrisonfaulkner/calorie-app:latest
+    image: ghcr.io/harrisonfaulkner/recipe-macros-scraper:latest
     ports:
       - "8000:8000"
     environment:
@@ -49,7 +49,7 @@ The USDA API key is optional -- the local database handles most lookups. The API
 ### Building from source
 
 ```bash
-git clone https://github.com/harrisonfaulkner/calorie-app.git
+git clone https://github.com/harrisonfaulkner/recipe-macros-scraper.git
 cd calorie-app
 cp .env.example .env
 docker compose build
