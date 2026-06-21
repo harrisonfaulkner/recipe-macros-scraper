@@ -113,6 +113,13 @@
         const errorText = document.getElementById('error-text');
         const results = document.getElementById('results');
 
+        // HTML-escape to prevent XSS from scraped content
+        function esc(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
         // Strip tracking/UTM parameters from recipe URLs
         function cleanUrl(raw) {
             try {
@@ -222,7 +229,7 @@
                     : '';
                 return `
                     <div class="ingredient-row">
-                        <span>${ing.original_text}</span>
+                        <span>${esc(ing.original_text)}</span>
                         <span><small>${macroStr}</small></span>
                     </div>
                 `;
@@ -234,7 +241,7 @@
             if (data.instructions) {
                 const steps = data.instructions.split('\n').filter(s => s.trim());
                 instructionsContent.innerHTML = steps.map(step =>
-                    `<p class="instruction-step">${step}</p>`
+                    `<p class="instruction-step">${esc(step)}</p>`
                 ).join('');
                 instructionsSection.style.display = 'block';
             } else {
@@ -246,7 +253,7 @@
             const warningsList = document.getElementById('warnings-list');
             if (data.warnings && data.warnings.length > 0) {
                 warningsList.innerHTML = data.warnings.map(w =>
-                    `<li class="warning">${w}</li>`
+                    `<li class="warning">${esc(w)}</li>`
                 ).join('');
                 warningsSection.style.display = 'block';
             } else {

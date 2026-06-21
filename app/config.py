@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     request_timeout: int = 10
     log_level: str = "INFO"
-    allowed_origins: list[str] = ["*"]
+    allowed_origins: list[str] = ["https://calories.entitledosprey.com"]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

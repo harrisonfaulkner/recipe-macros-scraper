@@ -1,7 +1,8 @@
+import hmac
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -35,6 +36,13 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(request, "index.html")
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin(request: Request, key: str = Query("")):
+    if not settings.admin_api_key or not hmac.compare_digest(key, settings.admin_api_key):
+        return HTMLResponse("<h1>401</h1><p>Append ?key=YOUR_ADMIN_KEY to the URL</p>", status_code=401)
+    return templates.TemplateResponse(request, "admin.html", {"api_key": key})
 
 
 @app.get("/health")

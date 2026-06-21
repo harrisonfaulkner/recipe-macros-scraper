@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Recipe Macros</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root { --pico-font-size: 15px; }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 1rem;
+            border-radius: var(--pico-border-radius);
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+        }
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: block;
+        }
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: var(--pico-muted-color);
+        }
+        table { font-size: 0.9rem; }
+        .warn { color: var(--pico-del-color); }
+        .ok { color: var(--pico-ins-color); }
+        .section { margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>Admin Dashboard</h1>
+        <p id="loading">Loading...</p>
+        <div id="content" style="display:none;">
+
+            <div class="stat-grid" id="overview"></div>
+
+            <div class="section">
+                <h3>Daily Traffic</h3>
+                <table id="daily-table">
+                    <thead><tr><th>Date</th><th>Requests</th><th>Successful</th><th>Failed</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h3>Top Recipes</h3>
+                <table id="recipes-table">
+                    <thead><tr><th>Recipe</th><th>Hits</th><th>Last Seen</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h3>Recent Warnings</h3>
+                <table id="warnings-table">
+                    <thead><tr><th>Warning</th><th>Count</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h3>Recent Errors</h3>
+                <table id="errors-table">
+                    <thead><tr><th>URL</th><th>Error</th><th>Count</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <details>
+                    <summary>Ingredient Overrides ({{ overrides_count }})</summary>
+                    <table id="overrides-table">
+                        <thead><tr><th>Ingredient</th><th>FDC ID</th><th>USDA Description</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </details>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_KEY = {{ api_key|tojson }};
+        const headers = { 'X-Api-Key': API_KEY };
+
+        function esc(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '-';
+            const d = new Date(iso);
+            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        }
+
+        function shortUrl(url) {
+            try {
+                const u = new URL(url);
+                return u.hostname + u.pathname.replace(/\/$/, '');
+            } catch { return url; }
+        }
+
+        async function load() {
+            const [statsResp, warningsResp, errorsResp, overridesResp] = await Promise.all([
+                fetch('/api/v1/logs/stats', { headers }),
+                fetch('/api/v1/logs/warnings', { headers }),
+                fetch('/api/v1/logs/errors', { headers }),
+                fetch('/api/v1/overrides', { headers }),
+            ]);
+
+            const stats = await statsResp.json();
+            const warnings = await warningsResp.json();
+            const errors = await errorsResp.json();
+            const overrides = await overridesResp.json();
+            const o = stats.overview;
+
+            // Overview cards
+            const successRate = o.total_requests > 0
+                ? Math.round((o.successful / o.total_requests) * 100) : 0;
+            const cards = [
+                { label: 'Total Requests', value: o.total_requests },
+                { label: 'Successful', value: o.successful },
+                { label: 'Failed', value: o.failed },
+                { label: 'Success Rate', value: successRate + '%' },
+                { label: 'Unique URLs', value: o.unique_urls },
+                { label: 'Avg Duration', value: (o.avg_duration_s || 0).toFixed(2) + 's' },
+            ];
+            document.getElementById('overview').innerHTML = cards.map(c => `
+                <div class="stat-card">
+                    <span class="value">${c.value}</span>
+                    <span class="label">${c.label}</span>
+                </div>
+            `).join('');
+
+            // Daily
+            const dailyBody = document.querySelector('#daily-table tbody');
+            dailyBody.innerHTML = stats.daily.map(d => `
+                <tr>
+                    <td>${d.date}</td>
+                    <td>${d.requests}</td>
+                    <td class="ok">${d.successful}</td>
+                    <td class="warn">${d.requests - d.successful}</td>
+                </tr>
+            `).join('');
+
+            // Top recipes
+            const recipesBody = document.querySelector('#recipes-table tbody');
+            recipesBody.innerHTML = stats.top_recipes.map(r => `
+                <tr>
+                    <td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || shortUrl(r.url))}</a></td>
+                    <td>${r.hits}</td>
+                    <td>${formatDate(r.last_seen)}</td>
+                </tr>
+            `).join('');
+
+            // Warnings
+            const warningsBody = document.querySelector('#warnings-table tbody');
+            if (warnings.length === 0) {
+                warningsBody.innerHTML = '<tr><td colspan="2">No warnings</td></tr>';
+            } else {
+                warningsBody.innerHTML = warnings.map(w => `
+                    <tr>
+                        <td>${esc(w.warnings)}</td>
+                        <td>${w.count}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Errors
+            const errorsBody = document.querySelector('#errors-table tbody');
+            if (errors.length === 0) {
+                errorsBody.innerHTML = '<tr><td colspan="3">No errors</td></tr>';
+            } else {
+                errorsBody.innerHTML = errors.map(e => {
+                    const errMsg = e.error.split('\n')[0].replace(/^Client error '/, '').replace(/' for url.*/, '');
+                    return `
+                        <tr>
+                            <td>${esc(shortUrl(e.url))}</td>
+                            <td class="warn">${esc(errMsg)}</td>
+                            <td>${e.count}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Overrides
+            const overridesBody = document.querySelector('#overrides-table tbody');
+            document.querySelector('details summary').textContent =
+                'Ingredient Overrides (' + overrides.length + ')';
+            overridesBody.innerHTML = overrides.map(o => `
+                <tr>
+                    <td>${esc(o.ingredient_name)}</td>
+                    <td>${o.fdc_id}</td>
+                    <td>${esc(o.usda_description || '-')}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+        }
+
+        load();
+    </script>
+</body>
+</html>

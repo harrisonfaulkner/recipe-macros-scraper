@@ -51,13 +51,22 @@ async def parse_recipe(request: RecipeParseRequest):
 
     try:
         scraped = await scrape_recipe(url)
+    except ValueError as e:
+        # URL validation failures (SSRF protection)
+        duration = time.time() - start
+        log_request(url=url, success=False, error=str(e), duration_s=duration)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         duration = time.time() - start
         error_str = str(e)
+        logger.warning(f"Scrape failed for {url}: {error_str}")
         log_request(url=url, success=False, error=error_str, duration_s=duration)
-        detail = f"Could not scrape recipe from URL: {e}"
         if "403" in error_str:
-            detail = "This site blocked our request (403 Forbidden). Some sites like AllRecipes use bot protection that prevents scraping."
+            detail = "This site blocked our request. Some sites use bot protection that prevents scraping."
+        elif "404" in error_str:
+            detail = "Recipe page not found (404). Check that the URL is correct."
+        else:
+            detail = "Could not scrape recipe from the provided URL."
         raise HTTPException(status_code=422, detail=detail)
 
     warnings: list[str] = []
