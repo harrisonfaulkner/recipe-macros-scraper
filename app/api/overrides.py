@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.auth import require_admin
 from app.services.overrides import list_overrides, set_override, delete_override
 from app.services.nutrition import get_nutrients, _get_db
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 class OverrideRequest(BaseModel):

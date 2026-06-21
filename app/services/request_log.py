@@ -98,3 +98,50 @@ def get_warning_summary() -> list[dict]:
         LIMIT 50
     """)
     return [dict(row) for row in cur.fetchall()]
+
+
+def get_stats() -> dict:
+    """Get traffic and usage statistics."""
+    db = _get_log_db()
+
+    # Overall counts
+    cur = db.execute("""
+        SELECT
+            COUNT(*) as total_requests,
+            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful,
+            SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+            COUNT(DISTINCT url) as unique_urls,
+            ROUND(AVG(CASE WHEN success = 1 THEN duration_s END), 3) as avg_duration_s,
+            MIN(timestamp) as first_request,
+            MAX(timestamp) as last_request
+        FROM request_log
+    """)
+    overview = dict(cur.fetchone())
+
+    # Requests per day
+    cur = db.execute("""
+        SELECT DATE(timestamp) as date, COUNT(*) as requests,
+               SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful
+        FROM request_log
+        GROUP BY DATE(timestamp)
+        ORDER BY date DESC
+        LIMIT 30
+    """)
+    daily = [dict(row) for row in cur.fetchall()]
+
+    # Top recipes
+    cur = db.execute("""
+        SELECT url, title, COUNT(*) as hits, MAX(timestamp) as last_seen
+        FROM request_log
+        WHERE success = 1
+        GROUP BY url
+        ORDER BY hits DESC
+        LIMIT 20
+    """)
+    top_recipes = [dict(row) for row in cur.fetchall()]
+
+    return {
+        "overview": overview,
+        "daily": daily,
+        "top_recipes": top_recipes,
+    }
