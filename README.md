@@ -14,16 +14,47 @@ Supports 646+ recipe websites including BBC Good Food, Budget Bytes, Food Networ
 
 ## Quick Start
 
-```bash
-cp .env.example .env
-# Add your USDA API key (get one free at https://fdc.nal.usda.gov/api-key-signup)
-# The API key is optional -- the local database handles most lookups
+The easiest way to run this is with the pre-built image from GitHub Container Registry:
 
-docker compose build
+```bash
+docker pull ghcr.io/harrisonfaulkner/calorie-app:latest
+docker run -p 8000:8000 ghcr.io/harrisonfaulkner/calorie-app:latest
+```
+
+Or with docker compose, create a `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/harrisonfaulkner/calorie-app:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - USDA_API_KEY=  # optional, get one free at https://fdc.nal.usda.gov/api-key-signup
+    volumes:
+      - app-data:/app/data/runtime
+
+volumes:
+  app-data:
+```
+
+```bash
 docker compose up -d
 ```
 
-The app will be available at `http://localhost:8000` (via nginx) or directly on port 8000 from the app container.
+The app will be available at `http://localhost:8000`.
+
+The USDA API key is optional -- the local database handles most lookups. The API is used as a fallback for foods not in the local database.
+
+### Building from source
+
+```bash
+git clone https://github.com/harrisonfaulkner/calorie-app.git
+cd calorie-app
+cp .env.example .env
+docker compose build
+docker compose up -d
+```
 
 ## API
 
@@ -109,7 +140,7 @@ app/
   services/      business logic (scraper, parser, nutrition, calculator)
   models/        pydantic schemas
   data/          nutrition DB build script
-  templates/     web frontend (single page, Pico CSS)
+  templates/     web frontend (single page)
 nginx/           nginx configs (SSL + HTTP-only init)
 ```
 
